@@ -9,6 +9,7 @@ import java.io.*;
 import java.net.Socket;
 
 public class TestSign extends JFrame{
+	
 	/*임시로 만든 로그인/회원가입/대기실 화면*/
 	Protocol response = null;
 	public InformationBar text;
