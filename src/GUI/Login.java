@@ -6,35 +6,34 @@ import javax.swing.*;
 /**
  * class: Sign
  * description: 로그인 화면
- * @author 201937402 강태훈
  */
-public class Sign extends JFrame {
+public class Login extends JFrame {
 	
-	Box mainBox, errorBox;
+	public Box mainBox, errorBox;
 	
 	/* Button
 	 * Sign in 버튼: btn.btn1 (JButton)
 	 * Sign up 버튼: btn.btn2 (JButton) */
-	BtnPanel btn;
+	public BtnPanel btn;
 	
 	/* ID
 	 * ID 입력창: ID.infoField (JTextField)
 	 * JTextField: 입력한 문장을 getText()를 이용해 String type으로 return */
-	InformationBar ID;
+	public InformationBar idBar;
 	
 	/* Password
 	 * PW 입력창: password.infoField (JTextFiled)
 	 * JTextField: 입력한 문장을 getText()를 이용해 String type으로 return */
-	PasswordBar password;
+	public PasswordBar passwordBar;
 
 	/* Error
 	 * Error 접근 (JLabel)
 	 * JLabel을 포함한 대부분의 component는 setText(String s)로 문구 변경 가능 */
-	JLabel error;
+	public JLabel error;
 	
-	public Sign() {
+	public Login () {
 	    // 로그인하는 프레임 생성
-		super("Sign");
+		super("Login");
 	    setSize(300, 250);
 
 	    // component들을 위에서 아래로 배치할 메인 박스
@@ -44,13 +43,13 @@ public class Sign extends JFrame {
 	    setLocationRelativeTo(null);
 
 	    // ID 문구 + 입력창
-	    ID = new InformationBar("ID");
+	    idBar = new InformationBar("ID");
 
 	    // PW 문구 + 입력창
-	    password = new PasswordBar("PW");
+	    passwordBar = new PasswordBar("password");
 
 	    // Sign in, Sign up 버튼 (너비: 300, 높이: 40, 옆으로 나열) 2개
-	    btn = new BtnPanel("Sign in", "Sign up", 300, 40);
+	    btn = new BtnPanel("Login", "Sign Up", 300, 40);
 
 	    // 오류 문구 표시
 	    error = new JLabel("여기에 오류 문구 출력");
@@ -60,8 +59,8 @@ public class Sign extends JFrame {
 	    errorBox.add(error, BorderLayout.CENTER); // 오류 문구를 가운데에 배치
 
 	    /* 메인 박스에 ID와 PW 입력창, 오류 문구, 로그인, 회원가입 버튼을 순서대로 넣기 */
-	    mainBox.add(ID);
-	    mainBox.add(password);
+	    mainBox.add(idBar);
+	    mainBox.add(passwordBar);
 	    mainBox.add(errorBox);
 	    mainBox.add(btn);
 
@@ -74,5 +73,9 @@ public class Sign extends JFrame {
 	    // x 버튼 눌렀을 때 닫히도록 설정, 다른 기능 삽입 가능
 	    setDefaultCloseOperation(EXIT_ON_CLOSE);
 	    setVisible(true);
+	}
+	
+	public static void main(String[] args) {
+		new Login();
 	}
 }

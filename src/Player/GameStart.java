@@ -2,67 +2,145 @@ package Player;
 
 import GUI.*;
 import Server.*;
+import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.io.*;
 import java.awt.event.*;
 
+/**
+ * [class GameStart] to play the game, it must be executed
+ */
 public class GameStart {
 	public static void main(String[] args) throws Exception {
 		new Launch();
 	}
 }
 
+/**
+ * [class Launch]
+ */
 class Launch {
 	public final static String SERVER_IP = "127.0.0.1";
 	public final static int SERVER_PORT = 9999;
 
 	Game game;
 	Login login;
+
 	Socket socket;
 	ObjectInputStream in;
 	ObjectOutputStream out;
-	String name;
 
-	boolean myTurn; // 자기 턴인지 나타내는 변수, true일 때 자기 턴
-	boolean imReady, urReady; // 나와 상대의 준비 상태를 나타내는 변수, true일 때 준비
-	boolean begin; // 게임이 시작했는지를 나타내는 변수, true일 때 이미 시작함
-	char[][] board; // 누군가 이겼는지 판단하기 위한 변수
+	String name;
+	boolean myTurn; // true means my turn
+	boolean imReady; // true means "I'm ready."
+	boolean urReady; // true means "The opponent is ready."
+	boolean begin; // true means the game is already started
+	char[][] board; // 누가 이겼는지 판단
 
 	public Launch() throws Exception {
 		login = new Login();
 		init(); // 서버와 연결하는 함수
 	}
 
-	class Login extends TestSign implements ActionListener {
-		private static final long serialVersionUID = 1L;
+	/**
+	 * [method setName] set the name
+	 * 
+	 * @param name
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	/**
+	 * [class Login]
+	 */
+	class Login extends GUI.Login implements ActionListener {
 
 		public Login() throws Exception {
 			this.setVisible(true);
-			this.btns.btn1.addActionListener(this);
-			this.btns.btn2.addActionListener(this);
+			this.btn.btn1.addActionListener(this); // 로그인 버튼
+			this.btn.btn2.addActionListener(this); // 회원가입 버튼
 		}
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Object obj = e.getSource();
-			
-			// 회원가입: sign up 버튼이 눌렸을 때 TextField에 입력된 값을 읽어서 서버에 type이 sign up인 메시지를 보냄
-			if (obj == this.btns.btn1) {
+
+			// 로그인 버튼 눌렀을 때
+			if (obj == this.btn.btn1) {
 				try {
-					out.writeObject(new Protocol(3, text.infoField.getText()));
-					name = text.infoField.getText();
-				} catch (Exception e1) {
-					e1.printStackTrace();
+					String id = idBar.infoField.getText();
+					char[] temp = passwordBar.infoField.getPassword();
+					String password = new String(temp);
+					Player player = new Player(id, password);
+					
+					out.writeObject(new Protocol(1, player));
+					out.flush();
+
+					// 로그인 되었을 때 대기실로 넘어가도록 처리해줘야 함
+				} catch (IOException exception) {
+					exception.printStackTrace();
 				}
 			}
-			
-			 // 게임 신청: challenge 버튼이 눌렸을 때 TextField에 입력된 값을 읽어서 서버에 type이 challenge인 메시지를 보냄
-			else if (obj == this.btns.btn2 && !name.equals(text.infoField.getText())) {
+
+			// 회원가입 버튼 눌렀을 때
+			else if (obj == this.btn.btn2) {
+				this.setVisible(false);
+
 				try {
-					out.writeObject(new Protocol(5, name, text.infoField.getText()));
-				} catch (Exception e2) {
-					e2.printStackTrace();
+					new SignUp(); // 회원가입하기 위한 클래스 호출
+				} catch (Exception exception) {
+					exception.printStackTrace();
+				}
+			}
+		}
+	}
+
+	/**
+	 * [class SignUp] create player account
+	 */
+	class SignUp extends GUI.SignUp implements ActionListener {
+
+		public SignUp() throws Exception {
+			this.setVisible(true);
+			this.btn.btn1.addActionListener(this); // 확인 버튼
+			this.btn.btn2.addActionListener(this); // 취소 버튼
+		}
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			Object obj = e.getSource();
+
+			// 확인 버튼 눌렀을 때
+			if (obj == this.btn.btn1) {
+				try {
+					String id = idBar.infoField.getText();
+					char[] temp1 = passwordBar.infoField.getPassword();
+					String password = new String(temp1);
+					char[] temp2 = rePasswordBar.infoField.getPassword();
+					String rePassword = new String(temp2);
+					String name = nameBar.infoField.getText();
+					String nickname = nicknameBar.infoField.getText();
+					String email = emailBar.infoField.getText();
+					String site = siteBar.infoField.getText();
+					Player player = new Player(id, password, rePassword, name, nickname, email, site);
+					
+					out.writeObject(new Protocol(2, player));
+					out.flush();
+					setName(name);
+				} catch (Exception exception) {
+					exception.printStackTrace();
+				}
+			}
+
+			// 취소 버튼 눌렀을 때
+			else if (obj == this.btn.btn2) {
+				this.setVisible(false);
+
+				try {
+					new Login(); // 회원가입을 취소하였으므로 다시 로그인 화면으로 돌아감
+				} catch (Exception exception) {
+					exception.printStackTrace();
 				}
 			}
 		}
@@ -73,7 +151,7 @@ class Launch {
 		try {
 			socket = new Socket(SERVER_IP, SERVER_PORT);
 			out = new ObjectOutputStream(socket.getOutputStream());
-			
+
 			/* Receiver 실행 */
 			Thread receiver = new Thread(new ClientReceiver(socket));
 			receiver.start();
@@ -164,7 +242,9 @@ class Launch {
 		public ClientReceiver(Socket socket) {
 			try {
 				in = new ObjectInputStream(socket.getInputStream());
-			} catch (IOException e) { e.printStackTrace(); }
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 
 		public void run() {
@@ -172,11 +252,11 @@ class Launch {
 				try {
 					/* 서버가 보내는 메시지를 계속해서 읽음 */
 					response = (Protocol) in.readObject();
-					
+
 					/* 서버가 보내는 메시지를 표시 */
 					System.out.println("type: " + response.getType() + ", from: " + response.getFrom() + ", to: "
 							+ response.getTo() + ", content: " + response.getContent());
-					
+
 					/* type이 invite인 메시지: 게임을 신청했을 때 게임을 실행함 */
 					if (response.getType() == 7) {
 						myTurn = false; // 게임을 실행함
@@ -184,7 +264,7 @@ class Launch {
 						game.gameBoard.turn.setText("준비 중");
 						login.setVisible(false);
 					}
-					
+
 					/* type이 invited인 메시지: 게임을 신청받았을 때 */
 					else if (response.getType() == 8) {
 						myTurn = true; // 게임을 실행함
@@ -192,13 +272,13 @@ class Launch {
 						game.gameBoard.turn.setText("준비 중");
 						login.setVisible(false);
 					}
-					
+
 					/* type이 chat인 메시지: 게임 중 누군가 채팅을 입력했을 때 */
 					else if (response.getType() == 4) {
 						/* 채팅창에 채팅 내용을 표시함 */
 						game.chatWindow.Contents.addElement("[" + response.getFrom() + "]" + response.getContent());
 					}
-					
+
 					/* type이 ready인 메시지: 게임 중 누군가 준비 버튼을 눌렀을 때 */
 					else if (response.getType() == 10) {
 						/* 상대가 준비 버튼을 눌렀다면 */

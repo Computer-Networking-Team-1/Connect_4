@@ -10,7 +10,7 @@ import javax.swing.*;
  */
 public class PasswordBar extends JPanel{
 	JLabel infoLabe;
-	JPasswordField infoField;
+	public JPasswordField infoField;
 	Box infoBox;
 
 	public PasswordBar(String info) {

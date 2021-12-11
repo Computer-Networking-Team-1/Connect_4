@@ -8,24 +8,24 @@ public class Protocol implements Serializable {
    
    /**
     * type
-    *    1. log in
-    *    2. sign in
-    *    3. sign up (회원가입)		type, from
-    *    4. chat (채팅)			type, from, to, content
-    *    5. challenge (도전)		type, from, to
-    *    6. information (정보)	type, from, to
-    *    7. invite
-    *    8. invited
-    *    9. notice
-    *    10. ready
-    *    11. play
-    *    12. result
-    *    
+    *    1. login
+    *    2. sign up (회원가입)
+    *    3. chat (채팅)
+    *    4. challenge (도전)
+    *    5. information (정보)
+    *    6. invite
+    *    7. invited
+    *    8. notice
+    *    9. ready
+    *    10. play
+    *    11. result
     */
+	
    private int type;
-   private String from;   // sender
-   private String to;      // receiver
+   private String from;		// sender
+   private String to;		// receiver
    private String content;
+   private Player player;
 
    /**
     * 
@@ -36,6 +36,7 @@ public class Protocol implements Serializable {
       this.from = null;
       this.to = null;
       this.content = null;
+      this.player = null;
    }
 
    /**
@@ -47,31 +48,46 @@ public class Protocol implements Serializable {
       this.from = from;
       this.to = null;
       this.content = null;
+      this.player = null;
    }
    
    /**
     * @param type   유형
     * @param from   보내는 쪽 (sender)
-    * @param to   받는 쪽 (receiver)
+    * @param to		받는 쪽 (receiver)
     */
    public Protocol(int type, String from, String to) {
       this.type = type;
       this.from = from;
       this.to = to;
       this.content = null;
+      this.player = null;
    }
    
    /**
-    * @param type      유형
-    * @param from      보내는 쪽 (sender)
-    * @param to      받는 쪽 (receiver)
-    * @param content   내용
+    * @param type		유형
+    * @param from		보내는 쪽 (sender)
+    * @param to			받는 쪽 (receiver)
+    * @param content	내용
     */
    public Protocol(int type, String from, String to, String content) {
       this.type = type;
       this.from = from;
       this.to = to;
       this.content = content;
+      this.player = null;
+   }
+   
+   /**
+    * @param type		유형
+    * @param player		플레이어 객체
+    */
+   public Protocol(int type, Player player) {
+	   this.type = type;
+	   this.from = null;
+	   this.to = null;
+	   this.content = null;
+	   this.player = player;
    }
    
    public void setType(int type) {
@@ -90,6 +106,10 @@ public class Protocol implements Serializable {
       this.content = content;
    }
    
+   public void setPlayer(Player player) {
+	   this.player = player;
+   }
+   
    public int getType() {
       return type;
    }
@@ -104,5 +124,9 @@ public class Protocol implements Serializable {
    
    public String getContent() {
       return content;
+   }
+   
+   public Player getPlayer() {
+	   return player;
    }
 }

@@ -1,12 +1,17 @@
-package Player;
+package Server;
 
 import java.io.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.*;
 
 public class Player implements Serializable {
 	
 	/* field */
 	private String ID;			// 회원 아이디
+	private String password;
+	private String rePassword;
 	private String hashingPW;	// 회원 비밀번호 (복호화를 못 하도록 단방향 해시 함수 통해 암호화)
 	private String salt;		// 비밀번호 암호화를 위한 salt
 	private String name;		// 회원 이름
@@ -23,6 +28,9 @@ public class Player implements Serializable {
 	private int totalCount = 0;	// 전체 게임 횟수
 	
 	private int status = 0; // 0: 로그아웃, 1: 대기중, 2: 게임중
+	
+	private static HashMap<String, String> passwordMap = new HashMap<>();	// id and password
+	private static HashMap<String, String> saltMap = new HashMap<>();
 
 	/* initialize constructor */
 	public Player() {
@@ -41,16 +49,24 @@ public class Player implements Serializable {
 	}
 
 	/* 회원가입할 때 */
-	public Player(String ID, String password, String name, String nickname, String email, String site) {
+	public Player(String ID, String password, String rePassword, String name, String nickname, String email, String site) throws NoSuchAlgorithmException {
 		this.ID = ID;
-		this.hashingPW = password;
+		this.password = password;
+		this.rePassword = rePassword;
 		this.name = name;
 		this.nickname = nickname;
 		this.email = email;
 		this.site = site;
+		saltedPassword(ID, password);
 	}
 	
-	public Player(String ID, String password, String name, String nickname, String email, String site, int countWin, int countDraw, int countLose) {
+	/* 로그인할 때 */
+	public Player(String ID, String password) {
+		this.ID = ID;
+		this.password = password;
+	}
+	
+	public Player(String ID, String password, String name, String nickname, String email, String site, int countWin, int countDraw, int countLose) throws NoSuchAlgorithmException {
 		this.ID = ID;
 		this.hashingPW = password;
 		this.name = name;
@@ -61,8 +77,17 @@ public class Player implements Serializable {
 		this.countDraw = countDraw;
 		this.countLose = countLose;
 		this.totalCount = this.countWin + this.countDraw + this.countLose;
+		saltedPassword(ID, password);
 	}
 
+	public static void saltedPassword(String ID, String password) throws NoSuchAlgorithmException {
+		byte[] newSalt = getSalt();
+		byte[] newHash = getSaltedHash(password, newSalt);
+		
+		passwordMap.put(ID, bytesToHex(newHash));
+		saltMap.put(ID, bytesToHex(newSalt));
+	}
+	
 	/* set method */
 	public void setID(String ID) {
 		this.ID = ID;
@@ -106,7 +131,7 @@ public class Player implements Serializable {
 	private void setTotalCount() {
 		this.totalCount = this.countWin + this.countDraw + this.countLose;
 	}
-
+	
 	/* get method */
 	public String getID() {
 		return this.ID;
@@ -187,4 +212,60 @@ public class Player implements Serializable {
 		return loginInfo;
 	}
 	
+    public static boolean checkPlayer(String ID) {
+        return passwordMap.containsKey(ID);
+    }
+	
+	public static boolean checkLogin(String ID, String password) throws NoSuchAlgorithmException {
+        String salt = saltMap.get(ID);
+        byte[] byteSalt = hexToBytes(salt);
+        String saltedPasswordHash = bytesToHex(getSaltedHash(password, byteSalt));
+
+        if (saltedPasswordHash.equals(passwordMap.get(ID))) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+	
+    /* return byte array of randomly generated salt number */
+    public static byte[] getSalt() {
+        SecureRandom sr = new SecureRandom();
+        byte[] salt = new byte[16];
+        sr.nextBytes(salt);
+
+        return salt;
+    }
+	
+    /* use SHA-256 to create a hash of password string and salt byte array */
+    public static byte[] getSaltedHash(String password, byte[] salt) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        md.update(salt);
+        byte[] hashBytes = md.digest(password.getBytes());
+        md.reset();
+
+        return hashBytes; // return salted password hash as byte array
+    }
+	
+    /* convert a byte array to a hexadecimal number */
+    public static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < bytes.length; i++) {
+            sb.append(Integer.toString((bytes[i] & 0xff) + 0x100, 16).substring(1));
+        }
+
+        return sb.toString();
+    }
+	
+    /* convert a hexadecimal number to a byte array */
+    public static byte[] hexToBytes(String hex) {
+        byte[] hexBytes = new byte[hex.length() / 2];
+
+        for (int i = 0; i < hexBytes.length; i++) {
+            hexBytes[i] = (byte) Integer.parseInt(hex.substring(2 * i, 2 * i + 2), 16);
+        }
+
+        return hexBytes;
+    }
 }
