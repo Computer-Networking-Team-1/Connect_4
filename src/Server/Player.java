@@ -8,93 +8,174 @@ import java.util.*;
 
 public class Player implements Serializable {
 	
-	/* field */
-	private String ID;			// 회원 아이디
-	private String password;
-	private String rePassword;
-	private String hashingPW;	// 회원 비밀번호 (복호화를 못 하도록 단방향 해시 함수 통해 암호화)
-	private String salt;		// 비밀번호 암호화를 위한 salt
-	private String name;		// 회원 이름
-	private String nickname;	// 회원 닉네임
-	private String email;		// 회원 이메일
-	private String site;		// 회원 SNS 및 홈페이지 주소
+	// private static ArrayList<String[]> player = new ArrayList<>();
+	public static ArrayList<Player> players = new ArrayList<Player>();
 	
-	private int loginCount;		// 접속 횟수
-	private String lastLog;		// 마지막 접속 정보 (IP주소, 시간)
+	private String id;				// 아이디
+	private byte[] passwordToByte;	//
+	private String password;		// 비밀번호 (복호화를 못 하도록 단방향 해시 함수 통해 암호화)
+	private String salt;			// 비밀번호 암호화를 위한 솔트
+	private String name;			// 이름
+	private String nickname;		// 닉네임
+	private String email;			// 이메일
+	private String site;			// SNS 및 홈페이지 주소
 	
-	private int countWin = 0;	// 이긴 횟수 (승)
-	private int countDraw = 0;	// 비긴 횟수 (무승부)
-	private int countLose = 0;	// 진 횟수 (패)
-	private int totalCount = 0;	// 전체 게임 횟수
+	private int countWin = 0;		// 이긴 횟수 (승)
+	private int countDraw = 0;		// 비긴 횟수 (무승부)
+	private int countLose = 0;		// 진 횟수 (패)
+	private int totalCount = 0;		// 전체 게임 횟수
 	
-	private int status = 0; // 0: 로그아웃, 1: 대기중, 2: 게임중
-	
-	private static HashMap<String, String> passwordMap = new HashMap<>();	// id and password
-	private static HashMap<String, String> saltMap = new HashMap<>();
+	private int loginCount;					// 접속 횟수
+	private String[] log = new String[2];	// 마지막 접속 정보 (IP주소, 시간)
+	private int status = 0; 				// [0] 로그아웃 [1] 대기중 [2] 게임중
 
-	/* initialize constructor */
-	public Player() {
-		this.ID = null;
-		this.hashingPW = null;
-		this.name = null;
-		this.nickname = null;
-		this.email = null;
-		this.site = null;
-		this.loginCount = 0;
-		this.lastLog = null;
-		this.countWin = 0;
-		this.countDraw = 0;
-		this.countLose = 0;
-		this.totalCount = this.countWin + this.countDraw + this.countLose;
+	public Player() {}
+	
+	// 로그인 (일회성)
+	public Player(String id, byte[] passwordToByte) {
+		this.id = id;
+		this.passwordToByte = passwordToByte;
 	}
-
-	/* 회원가입할 때 */
-	public Player(String ID, String password, String rePassword, String name, String nickname, String email, String site) throws NoSuchAlgorithmException {
-		this.ID = ID;
-		this.password = password;
-		this.rePassword = rePassword;
+	
+	// 회원가입 (일회성)
+	public Player(String id, byte[] passwordToByte, String name, String nickname, String email, String site) {
+		this.id = id;
+		this.passwordToByte = passwordToByte;
 		this.name = name;
 		this.nickname = nickname;
 		this.email = email;
 		this.site = site;
-		saltedPassword(ID, password);
 	}
 	
-	/* 로그인할 때 */
-	public Player(String ID, String password) {
-		this.ID = ID;
+	/**
+	 * [method setPlayer] create player (at Sign Up)
+	 * @param id
+	 * @param password
+	 * @param salt
+	 */
+	public void setPlayer(String id, String password, String salt, Player temp) {
+		this.id = id;
 		this.password = password;
-	}
-	
-	public Player(String ID, String password, String name, String nickname, String email, String site, int countWin, int countDraw, int countLose) throws NoSuchAlgorithmException {
-		this.ID = ID;
-		this.hashingPW = password;
-		this.name = name;
-		this.nickname = nickname;
-		this.email = email;
-		this.site = site;
-		this.countWin = countWin;
-		this.countDraw = countDraw;
-		this.countLose = countLose;
-		this.totalCount = this.countWin + this.countDraw + this.countLose;
-		saltedPassword(ID, password);
-	}
-
-	public static void saltedPassword(String ID, String password) throws NoSuchAlgorithmException {
-		byte[] newSalt = getSalt();
-		byte[] newHash = getSaltedHash(password, newSalt);
+		this.salt = salt;
+		this.name = temp.getName();
+		this.nickname = temp.getNickname();
+		this.email = temp.getEmail();
+		this.site = temp.getEmail();
 		
-		passwordMap.put(ID, bytesToHex(newHash));
-		saltMap.put(ID, bytesToHex(newSalt));
+		this.loginCount = 0;
+		this.log = null;
+		
+		players.add(this);
 	}
 	
-	/* set method */
-	public void setID(String ID) {
-		this.ID = ID;
+	/**
+	 * [method check] 아이디와 비밀번호가 일치하는지 체크
+	 * @param id
+	 * @param password
+	 * @return true if matched, or false if not matched
+	 */
+	public boolean check(String id, String password) {
+		for(int i = 0; i < players.size(); i++) {
+			if(id.contentEquals(players.get(i).getId()) && password.equals(players.get(i).getPassword())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
-	public void setPW(String password) {
-		this.hashingPW = password;
+	/**
+	 * [method getSalt] 아이디에 해당하는 솔트 값 반환
+	 * @param id
+	 * @return salt if found, or false if not found
+	 */
+	public String getSalt(String id) {
+		for(int i = 0; i < players.size(); i++) {
+			if(id.contentEquals(players.get(i).getId())) {
+				return players.get(i).getSalt();
+			}
+		}
+		return null;	// 아이디가 존재하지 않을 경우 null
+	}
+	
+	/**
+	 * [method setInformation] initialize the setting with the data stored in the file
+	 */
+	public static void setInformation() {
+		File file = new File("./player_information.txt");
+		FileInputStream fileInputStream = null;
+		ObjectInputStream fromFile = null;
+		
+		try {
+			fileInputStream = new FileInputStream(file);
+			fromFile = new ObjectInputStream(fileInputStream);
+			players = new ArrayList<Player>();
+			
+			while(true) {
+				Player temp = (Player) fromFile.readObject();
+				players.add(temp);
+				
+				System.out.printf(">> [method setInformation] Deserializable object: %s %s %s %s %s %s\n", 
+						temp.getId(), temp.getPassword(), temp.getName(), temp.getNickname(),
+						temp.getEmail(), temp.getSite());
+			}
+		} catch(EOFException e) {
+			e.printStackTrace();
+		} catch(Exception e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if(fileInputStream != null) {
+					fileInputStream.close();
+				}
+				
+				if(fromFile != null) {
+					fromFile.close();
+				}
+			} catch(Exception e) {
+				// none
+			}
+		}
+		System.out.println(">> finish the initial setting");
+	}
+	
+	/**
+	 * [method updateInformation] update the information in the file
+	 */
+	public static void updateInformation() {
+		File file = new File("./player_information.txt");
+		FileOutputStream fileOutputStream = null;
+		ObjectOutputStream toFile = null;	// 파일에 객체 입력하기 위해서
+		try {
+			fileOutputStream = new FileOutputStream(file);
+			toFile = new ObjectOutputStream(fileOutputStream);
+			ObjectInputStream fromFile = new ObjectInputStream(new FileInputStream(file)); // 테스트: 파일에 쓴 객체 읽어와서 출력
+			
+			for(int i = 0; i < players.size(); i++) {
+				toFile.writeObject(players.get(i));
+				toFile.flush();
+			}
+			
+			for(int i = 0; i < players.size(); i++) {
+				Player test = (Player) fromFile.readObject();
+				System.out.printf(">> [method updateInformation] Deserializable object: %s %s %s %s %s %s\n", 
+						test.getId(), test.getPassword(), test.getName(), test.getNickname(),
+						test.getEmail(), test.getSite());
+			}
+			
+			fileOutputStream.close();
+			toFile.close();
+			fromFile.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void setID(String id) {
+		this.id = id;
+	}
+
+	public void setPassword(String password) {
+		this.password = password;
 	}
 	
 	public void setName(String name) {
@@ -132,23 +213,20 @@ public class Player implements Serializable {
 		this.totalCount = this.countWin + this.countDraw + this.countLose;
 	}
 	
-	/* get method */
-	public String getID() {
-		return this.ID;
+	public String getId() {
+		return this.id;
 	}
 	
-	public String getHashingPW() {
-		return this.hashingPW;
+	public byte[] getPasswordByte() {
+		return this.passwordToByte;
 	}
 	
-	/* 해당 ID의 SALT 값 찾기 */
-	private String getSALT(ArrayList<Player> player, String ID) {
-		for(int i = 0; i < player.size(); i++) {
-			if(ID.equals(player.get(i).getID())) {
-				return player.get(i).getHashingPW();
-			}
-		}
-		return null; // ID가 존재하지 않을 경우
+	private String getPassword() {
+		return this.password;
+	}
+	
+	public String getSalt() {
+		return this.salt;
 	}
 	
 	public String getName() {
@@ -182,90 +260,4 @@ public class Player implements Serializable {
 	public int getTotalCount() {
 		return this.totalCount;
 	}
-	
-	/* 로그인할 때 ID와 비밀번호가 일치하는지 체크 */
-	public boolean login(ArrayList<Player> player, String ID, String hashingPW) {
-		for(int i = 0; i < player.size(); i++) {
-			if(ID.equals(player.get(i).getID())) {	// ID가 일치하는 경우
-				if(hashingPW.equals(player.get(i).getHashingPW())) {	// 암호화된 PW가 일치하는 경우
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-	
-	/* 해당 ID의 SALT 값 찾기 */
-	public String getSalt(ArrayList<Player> player, String ID) {
-		for(int i = 0; i < player.size(); i++) {
-			if(ID.contentEquals(player.get(i).getID())) return player.get(i).getSALT(player, ID);
-		}
-		return null; // ID가 존재하지 않을 경우
-	}
-	
-	/* return the information about login (ID and password) */
-	public String[] getLoginInfo() {
-		String[] loginInfo = new String[2];
-		loginInfo[0] = this.ID;
-		loginInfo[1] = this.hashingPW;
-
-		return loginInfo;
-	}
-	
-    public static boolean checkPlayer(String ID) {
-        return passwordMap.containsKey(ID);
-    }
-	
-	public static boolean checkLogin(String ID, String password) throws NoSuchAlgorithmException {
-        String salt = saltMap.get(ID);
-        byte[] byteSalt = hexToBytes(salt);
-        String saltedPasswordHash = bytesToHex(getSaltedHash(password, byteSalt));
-
-        if (saltedPasswordHash.equals(passwordMap.get(ID))) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-	
-    /* return byte array of randomly generated salt number */
-    public static byte[] getSalt() {
-        SecureRandom sr = new SecureRandom();
-        byte[] salt = new byte[16];
-        sr.nextBytes(salt);
-
-        return salt;
-    }
-	
-    /* use SHA-256 to create a hash of password string and salt byte array */
-    public static byte[] getSaltedHash(String password, byte[] salt) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        md.update(salt);
-        byte[] hashBytes = md.digest(password.getBytes());
-        md.reset();
-
-        return hashBytes; // return salted password hash as byte array
-    }
-	
-    /* convert a byte array to a hexadecimal number */
-    public static String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < bytes.length; i++) {
-            sb.append(Integer.toString((bytes[i] & 0xff) + 0x100, 16).substring(1));
-        }
-
-        return sb.toString();
-    }
-	
-    /* convert a hexadecimal number to a byte array */
-    public static byte[] hexToBytes(String hex) {
-        byte[] hexBytes = new byte[hex.length() / 2];
-
-        for (int i = 0; i < hexBytes.length; i++) {
-            hexBytes[i] = (byte) Integer.parseInt(hex.substring(2 * i, 2 * i + 2), 16);
-        }
-
-        return hexBytes;
-    }
 }

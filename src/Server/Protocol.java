@@ -20,7 +20,6 @@ public class Protocol implements Serializable {
     *    10. play
     *    11. result
     */
-	
    private int type;
    private String from;		// sender
    private String to;		// receiver

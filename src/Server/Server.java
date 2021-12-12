@@ -3,81 +3,91 @@ package Server;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 
 public class Server extends Thread {
 	private final static int SERVER_PORT = 9999;
-	private Socket socket = null;
+	private static final int SALT_SIZE = 16;		// 16bytes = 128bits
+	private static Player playerDB = new Player();	// player database (with ArrayList and file)
 	
-	// 로그인 끝난 뒤 아래 두 변수에 저장이 되어야 함
-	public static ArrayList<String> players = new ArrayList<String>();
+	public static ArrayList<Player> players = new ArrayList<Player>();
 	public static HashMap<String, ObjectOutputStream> sockets = new HashMap<String, ObjectOutputStream>();
 
+	private Socket socket = null;
+	
 	public Server(Socket socket) {
 		this.socket = socket;
 	}
 	
-	/* 들어온 유저 정보가 올바른지를 체크 */
-	public static boolean check(Player player) {
-		return true;
-	}
-	
 	public synchronized void addUser(Protocol request, ObjectOutputStream outToClient) {
 		sockets.put(request.getFrom(), outToClient);
-		players.add(request.getFrom()); // getPlayer();
+		players.add(request.getPlayer());
 	}
 	
 	public void run() {
-		System.out.println(">> Socket: " + socket);
+		System.out.println(">> " + socket);
 		Protocol request = null;
-		
-		ObjectInputStream in = null;
-		ObjectOutputStream out = null;
-		
-		// file
-		File file = new File("./player_information.txt");
-		FileOutputStream fileOutputStream = null;
-		ObjectOutputStream toFile = null;	// 파일에 객체 입력하기 위해서
+		ObjectInputStream in = null;	// 클라이언트로부터 객체를 읽어오기 위해
+		ObjectOutputStream out = null;	// 클라이언트로 객체를 내보내기 위해
 		
 		try {
-			/* inputStream, outputStream 생성 */
 			in = new ObjectInputStream(this.socket.getInputStream());
 			out = new ObjectOutputStream(this.socket.getOutputStream());
 			
-			/* client 측에 연결됐음을 알림 */
+			/* 클라이언트에 연결됐음을 알림 */
 			out.writeObject(new Protocol(9, "server", "user", "connected"));
 			out.flush();
 			
-			/* client 측에서 오는 메시지를 기다렸다가 반응해서 응답 */
+			/* 클라이언트에서 오는 메시지를 기다렸다가 반응해서 응답 */
 			while(in != null) {
-				request = (Protocol) in.readObject();
-				System.out.print(">> ");
-				System.out.println("type: " + request.getType() + " from: " + request.getFrom() + " to: " + request.getTo() + " content: " + request.getContent() + " player: " + request.getPlayer() + " users: " + players.size());
+				request = (Protocol) in.readObject();	// 클라이언트로부터 프로토콜 객체를 전달받기
+				System.out.println(">> type: " + request.getType() + " from: " + request.getFrom() + " to: " + request.getTo() + " content: " + request.getContent() + " player: " + request.getPlayer() + " users: " + players.size());
 				
 				int type = request.getType();
-				switch(type) {
+				Player temp = null;
+				String tempSalt = null;
+				String tempPassword = null;
 				
+				switch(type) {
+
 				/* [type: login] */
 				case 1:
-					Player loginTemp = (Player) request.getPlayer();
+					Player.setInformation();
+					temp = (Player) request.getPlayer();	// 아이디와 패스워드 정보가 담긴 객체를 받아서
+					tempSalt = playerDB.getSalt(temp.getId());
+					tempPassword = hashing(temp.getPasswordByte(), tempSalt);
 					
-					
+					if(playerDB.check(temp.getId(), tempPassword)) {	// 로그인 성공
+						System.out.println(">> login success");
+						out.writeObject(new Protocol(1, request.getFrom(), request.getTo(), "SUCCESS"));
+						out.flush();
+					}
+					else {	// 로그인 실패
+						System.out.println(">> login fail");
+						out.writeObject(new Protocol(1, request.getFrom(), request.getTo(), "FAIL"));
+						out.flush();
+					}
 					break;
 					
 				/* [type: sign up] 플레이어 목록에 추가하고 outputStream mapping */
-				case 3:
-					Player signUpTemp = (Player) request.getPlayer();
-					if(check(signUpTemp) == true) addUser(request, out);	// 들어온 플레이어 정보가 올바른지 체크 (아직 구현 X)
+				case 2:
+					Player.setInformation();
+					temp = (Player) request.getPlayer();
+					tempSalt = createSalt();
+					tempPassword = hashing(temp.getPasswordByte(), tempSalt);
+					playerDB.setPlayer(temp.getId(), tempPassword, tempSalt, temp);
 					
-					fileOutputStream = new FileOutputStream(file);
-					toFile = new ObjectOutputStream(fileOutputStream);
-					toFile.writeObject(signUpTemp);
-					
+					addUser(request, out);
+					Server.players = Player.players;
+					Player.updateInformation();
+
 					System.out.printf(">> ");
-					System.out.printf("[sign up] %d %s (# of users: %d)\n", request.getType(), request.getFrom(), players.size());
+					System.out.printf("Sign Up %d %s (# of users: %d)\n", request.getType(), request.getFrom(), players.size());
 					break;
 					
 				/* [type: chat] 양쪽 client에 채팅한 내용을 메시지로 보냄*/
-				case 4:
+				case 3:
 					System.out.println(request.getContent());
 					try {
 						out.writeObject(new Protocol(4, request.getFrom(), request.getTo(), request.getContent()));
@@ -90,7 +100,7 @@ public class Server extends Thread {
 					break;
 					
 				/* [type: challenge] 대결을 신청한 상대가 있으면 양쪽 client에 대결을 하라는 response 전송 */
-				case 5:
+				case 4:
 					// 대결을 신청한 대상의 이름을 플레이어 목록과 비교해서 있는지 확인
 					// 상대가 있으면 양쪽 client에 대결을 하라는 메시지를 보냄
 					if(players.contains(request.getTo())) {
@@ -112,10 +122,10 @@ public class Server extends Thread {
 					}
 					break;
 					
-				case 6:
+				case 5:
 					break;
 					
-				case 7:
+				case 6:
 					break;
 
 				/* [type: ready] 양쪽 client에 누군가 준비 버튼을 눌렀다고 알림 */
@@ -158,12 +168,53 @@ public class Server extends Thread {
 					break;
 				}
 			}
-			
-			toFile.close();
-			fileOutputStream.close();
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * [method hashing] hashing password
+	 * @param password
+	 * @param salt
+	 * @return hashing password
+	 */
+	private String hashing(byte[] password, String salt) throws Exception {
+		MessageDigest md = MessageDigest.getInstance("SHA-256");	// use SHA-256 hash function
+		
+		for(int i = 0; i < 10000; i++) {
+			String temp = byteToHex(password) + salt;	// 패스워드와 솔트를 합쳐 새로운 문자열 생성
+			md.update(temp.getBytes());					// 해싱한 문자열을 저장
+			password = md.digest();						// 다이제스트를 통해 패스워드 갱신
+		}
+		
+		return byteToHex(password);
+	}
+	
+	/**
+	 * [method createSalt] create a value of salt
+	 * @return a value of salt (hex)
+	 */
+	private String createSalt() throws Exception {
+		SecureRandom random = new SecureRandom();
+		byte[] temp = new byte[SALT_SIZE];
+		random.nextBytes(temp);	// 생성된 배열을 넣어 바이트 배열이 임의의 값들로 채워지도록 함으로써 솔트 생성
+		return byteToHex(temp);
+	}
+	
+	/**
+	 * [method byteToString] convert byte to hex
+	 * @param array of bytes
+	 * @return hex
+	 */
+	private String byteToHex(byte[] temp) {
+		StringBuilder sb = new StringBuilder();
+		
+		for(byte a: temp) {
+			sb.append(String.format("02x", a));
+		}
+		
+		return sb.toString();
 	}
 	
 	public static void main(String[] args) {
@@ -172,7 +223,6 @@ public class Server extends Thread {
 		
 		try {
 			listener = new ServerSocket(SERVER_PORT);
-			
 			while(true) {
 				client = listener.accept();
 				Server server = new Server(client);

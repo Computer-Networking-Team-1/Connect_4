@@ -64,4 +64,8 @@ public class WaitingRoom extends JFrame {
 	    setDefaultCloseOperation(EXIT_ON_CLOSE); // x 버튼 누르면 화면 종료
 		setVisible(true);
 	}
+	
+	public static void main(String[] args) {
+		new WaitingRoom();
+	}
 }

@@ -1,4 +1,4 @@
-package Player;
+package Client;
 
 import GUI.*;
 import Server.*;
@@ -10,7 +10,7 @@ import java.awt.event.*;
 /**
  * [class GameStart] to play the game, it must be executed
  */
-public class GameStart {
+public class Start {
 	public static void main(String[] args) throws Exception {
 		new Launch();
 	}
@@ -22,35 +22,51 @@ public class GameStart {
 class Launch {
 	public final static String SERVER_IP = "127.0.0.1";
 	public final static int SERVER_PORT = 9999;
-
-	Game game;
+	
 	Login login;
-
+	WaitingRoom waitingRoom;
+	Game game;
+	
 	Socket socket;
 	ObjectInputStream in;
 	ObjectOutputStream out;
 
 	String name;
-	boolean myTurn; // true means my turn
-	boolean imReady; // true means "I'm ready."
-	boolean urReady; // true means "The opponent is ready."
-	boolean begin; // true means the game is already started
-	char[][] board; // 누가 이겼는지 판단
+	boolean myTurn;		// true means my turn
+	boolean imReady;	// true means "I'm ready."
+	boolean urReady;	// true means "The opponent is ready."
+	boolean begin;		// true means the game is already started
+	char[][] board;		// 누가 이겼는지 판단
 
 	public Launch() throws Exception {
 		login = new Login();
-		init(); // 서버와 연결하는 함수
+		init();			// 서버와 연결하는 함수
 	}
 
 	/**
 	 * [method setName] set the name
-	 * 
 	 * @param name
 	 */
 	public void setName(String name) {
 		this.name = name;
 	}
 
+	/**
+	 * [method init] 서버 연결
+	 */
+	public void init() {
+		try {
+			socket = new Socket(SERVER_IP, SERVER_PORT);
+			out = new ObjectOutputStream(socket.getOutputStream());
+
+			/* Receiver 실행 */
+			Thread receiver = new Thread(new ClientReceiver(socket));
+			receiver.start();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	/**
 	 * [class Login]
 	 */
@@ -72,12 +88,10 @@ class Launch {
 					String id = idBar.infoField.getText();
 					char[] temp = passwordBar.infoField.getPassword();
 					String password = new String(temp);
-					Player player = new Player(id, password);
-					
+					Player player = new Player(id, password.getBytes());
+					this.setVisible(false);
 					out.writeObject(new Protocol(1, player));
 					out.flush();
-
-					// 로그인 되었을 때 대기실로 넘어가도록 처리해줘야 함
 				} catch (IOException exception) {
 					exception.printStackTrace();
 				}
@@ -123,11 +137,21 @@ class Launch {
 					String nickname = nicknameBar.infoField.getText();
 					String email = emailBar.infoField.getText();
 					String site = siteBar.infoField.getText();
-					Player player = new Player(id, password, rePassword, name, nickname, email, site);
+					Player player = new Player(id, password.getBytes(), name, nickname, email, site);
 					
 					out.writeObject(new Protocol(2, player));
 					out.flush();
+					
 					setName(name);
+					
+					this.setVisible(false);
+					
+					try {
+						new Login();
+					} catch(Exception exception) {
+						exception.printStackTrace();
+					}
+					
 				} catch (Exception exception) {
 					exception.printStackTrace();
 				}
@@ -146,20 +170,25 @@ class Launch {
 		}
 	}
 
-	/* 초기화: 서버 연결 */
-	public void init() {
-		try {
-			socket = new Socket(SERVER_IP, SERVER_PORT);
-			out = new ObjectOutputStream(socket.getOutputStream());
+	class WaitingRoom extends GUI.WaitingRoom implements ActionListener {
 
-			/* Receiver 실행 */
-			Thread receiver = new Thread(new ClientReceiver(socket));
-			receiver.start();
-		} catch (Exception e) {
-			e.printStackTrace();
+		public WaitingRoom() {
+			this.setVisible(true);
+		}
+		
+		public WaitingRoom(String user, String opponent) {
+			this.setVisible(true);
+		}
+		
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			
 		}
 	}
-
+	
+	/**
+	 * [class Game] 게임 실행
+	 */
 	class Game extends GameRoom implements ActionListener {
 		// 게임을 실행할 때 상대의 이름과 자신의 이름을 입력받아서 이름만 표시
 		// 추후 이름이 아니라 Player 객체를 입력하도록 수정해야 할듯
@@ -247,6 +276,7 @@ class Launch {
 			}
 		}
 
+		@SuppressWarnings("unchecked")
 		public void run() {
 			while (in != null) {
 				try {
@@ -257,30 +287,43 @@ class Launch {
 					System.out.println("type: " + response.getType() + ", from: " + response.getFrom() + ", to: "
 							+ response.getTo() + ", content: " + response.getContent());
 
-					/* type이 invite인 메시지: 게임을 신청했을 때 게임을 실행함 */
-					if (response.getType() == 7) {
+					int type = response.getType();
+					switch(type) {
+					
+					/* [type: login] */
+					case 1:
+						if(response.getContent().equals("SUCCESS")) {	// success
+							System.out.println(">> go waiting room");
+							waitingRoom = new WaitingRoom(response.getFrom(), response.getTo());
+							login.setVisible(false);
+						}
+						break;
+					
+						
+					/* [type: chat] 게임 중 누군가 채팅을 입력했을 때 */
+					case 4:
+						/* 채팅창에 채팅 내용을 표시함 */
+						game.chatWindow.Contents.addElement("[" + response.getFrom() + "]" + response.getContent());
+						break;
+
+					/* [type: invite] 게임을 신청했을 때 게임을 실행함 */
+					case 7:
 						myTurn = false; // 게임을 실행함
 						game = new Game(response.getFrom(), response.getTo());
 						game.gameBoard.turn.setText("준비 중");
 						login.setVisible(false);
-					}
-
-					/* type이 invited인 메시지: 게임을 신청받았을 때 */
-					else if (response.getType() == 8) {
+						break;
+						
+					/* [type: invited] 게임을 신청받았을 때 */
+					case 8:
 						myTurn = true; // 게임을 실행함
 						game = new Game(response.getFrom(), response.getTo());
 						game.gameBoard.turn.setText("준비 중");
 						login.setVisible(false);
-					}
-
-					/* type이 chat인 메시지: 게임 중 누군가 채팅을 입력했을 때 */
-					else if (response.getType() == 4) {
-						/* 채팅창에 채팅 내용을 표시함 */
-						game.chatWindow.Contents.addElement("[" + response.getFrom() + "]" + response.getContent());
-					}
-
-					/* type이 ready인 메시지: 게임 중 누군가 준비 버튼을 눌렀을 때 */
-					else if (response.getType() == 10) {
+						break;
+						
+					/* [type: ready] 게임 중 누군가 준비 버튼을 눌렀을 때 */
+					case 10:
 						/* 상대가 준비 버튼을 눌렀다면 */
 						if (response.getFrom().equals(game.opponent.nickname.getText())) {
 							/* 상대가 준비 상태에 들어가는 거라면 */
@@ -327,9 +370,10 @@ class Launch {
 								imReady = false;
 							}
 						}
-					}
-					/* type이 play인 메시지를 받았을 때 */
-					else if (response.getType() == 11) {
+						break;
+						
+					/* [type: play] */
+					case 11:
 						/* 내가 돌을 놓았다면 */
 						if (response.getFrom().equals(name)) {
 							int num = Integer.parseInt(response.getContent());
@@ -364,6 +408,10 @@ class Launch {
 							myTurn = true;
 							game.gameBoard.turn.setText("당신의 차례입니다");
 						}
+						break;
+						
+					default:
+						break;
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
