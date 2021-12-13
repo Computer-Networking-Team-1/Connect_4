@@ -10,15 +10,18 @@ public class Protocol implements Serializable {
     * type
     *    1. login
     *    2. sign up (회원가입)
-    *    3. chat (채팅)
+    *    3. chat (게임 중 채팅)
     *    4. challenge (도전)
     *    5. information (정보)
     *    6. invite
     *    7. invited
-    *    8. notice
-    *    9. ready
-    *    10. play
-    *    11. result
+    *    8. change (정보 수정)
+    *    9. ready (준비)
+    *    10. play (돌 놓기)
+    *    11. result (게임 결과)
+    *    12. wait (대기실 입장)
+    *    13. allchat (대기실 채팅)
+    *    14. logout (로그아웃)
     */
    private int type;
    private String from;		// sender
@@ -86,6 +89,19 @@ public class Protocol implements Serializable {
 	   this.from = null;
 	   this.to = null;
 	   this.content = null;
+	   this.player = player;
+   }
+   
+   public Protocol(int type, String content, Player player) {
+	   this.type = type;
+	   this.content = content;
+	   this.player = player;
+   }
+   
+   public Protocol(int type, String from, String to, Player player) {
+	   this.type = type;
+	   this.from = from;
+	   this.to = to;
 	   this.player = player;
    }
    

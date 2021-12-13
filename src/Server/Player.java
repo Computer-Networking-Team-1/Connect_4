@@ -77,10 +77,42 @@ public class Player implements Serializable {
 	public boolean check(String id, String password) {
 		for(int i = 0; i < players.size(); i++) {
 			if(id.contentEquals(players.get(i).getId()) && password.equals(players.get(i).getPassword())) {
+				players.get(i).setLoginCount();	// 접속할 때마다 ++
+				// 접속 정보 갱신
 				return true;
 			}
 		}
 		return false;
+	}
+	//중복되는 id인지 확인
+	public boolean idCheck(String id) {
+		for(Player p:players) {
+			if(id.equals(p.getId())) return false;
+		}
+		return true;
+	}
+	//중복되는 nickname인지 확인
+	public boolean nickCheck(String nickname) {
+		for(Player p:players) {
+			if(nickname.equals(p.getNickname())) return false;
+		}
+		return true;
+	}
+	//정보를 수정할 때, 다른 사람과 중복되는 nickname인지 확인
+	public boolean changeNickCheck(String nickname, String origin) {
+		for(Player p:players) {
+			if(nickname.equals(p.getNickname())&&!origin.equals(p.getNickname())) return false;
+		}
+		return true;
+	}
+	//id로 Player 객체를 찾아서 return
+	public Player getPlayerById(String id) {
+		for(Player p:players) {
+			if(p.getId().equals(id)) {
+				return p;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -213,6 +245,18 @@ public class Player implements Serializable {
 		this.totalCount = this.countWin + this.countDraw + this.countLose;
 	}
 	
+	public void setLoginCount() {
+		this.loginCount += 1;
+	}
+	
+	public void setLog() {
+		// 접속 정보
+	}
+	
+	public void setStatus(int status) {
+		this.status = status;
+	}
+	
 	public String getId() {
 		return this.id;
 	}
@@ -259,5 +303,8 @@ public class Player implements Serializable {
 
 	public int getTotalCount() {
 		return this.totalCount;
+	}
+	public int getStatus() {
+		return this.status;
 	}
 }

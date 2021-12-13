@@ -10,12 +10,13 @@ import javax.swing.*;
  * @author 201937402 강태훈
  */
 public class UserList extends JPanel {
-	DefaultListModel test;
+	public DefaultListModel content;
 	Box userBox, statusBox;
-	JList users;
-	JLabel userStatus;
-	JScrollPane userScroll;
-	BtnPanel userBtn, miscBtn;
+	public JList users;
+	public JLabel userStatus;
+	public JScrollPane userScroll;
+	public BtnPanel userBtn;
+	public BtnPanel miscBtn;
 	
 	public UserList(int width, int height) { // 너비와 높이를 입력받아 사용
 		super();
@@ -24,16 +25,11 @@ public class UserList extends JPanel {
 		userBox = Box.createVerticalBox();
 		userBox.setSize(width, height);
 		
-		test = new DefaultListModel();
+		content = new DefaultListModel();
 		
-		// 스크롤이 표시되는지 확인
-		// 실제로 구현할 때는 사용자의 정보를 사용
-		for(int i = 0; i < 100; i++) {
-			test.addElement("user" + Integer.toString(i));
-		}
 		
 		// 데이터로 리스트 생성
-		users = new JList(test);
+		users = new JList(content);
 
 		// 스크롤이 있는 리스트 생성
 		userScroll = new JScrollPane(users);
@@ -52,8 +48,6 @@ public class UserList extends JPanel {
 		userStatus.setMaximumSize(new Dimension(width, height / 6));
 		
 		statusBox = Box.createHorizontalBox();
-		statusBox.setOpaque(true);
-		statusBox.setBackground(new Color(255, 0, 0));
 		
 		// 사용자 전적 라벨을 가운데에 배치하기 위해 별도의 박스 사용
 		statusBox.add(userStatus, BorderLayout.CENTER);
