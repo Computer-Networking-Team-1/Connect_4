@@ -20,7 +20,7 @@ public class Protocol implements Serializable {
     *    10. play (돌 놓기)
     *    11. result (게임 결과)
     *    12. wait (대기실 입장)
-    *    13. allchat (대기실 채팅)
+    *    13. all chat (대기실 채팅)
     *    14. logout (로그아웃)
     */
    private int type;

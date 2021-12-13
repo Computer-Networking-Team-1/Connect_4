@@ -8,9 +8,9 @@ import java.util.*;
 import java.awt.event.*;
 
 /**
- * [class GameStart] to play the game, it must be executed
+ * [class GameStart] 게임 실행
  */
-public class Start {
+public class GameStart {
 	public static void main(String[] args) throws Exception {
 		new Launch();
 	}
@@ -24,7 +24,7 @@ class Launch {
 	public final static int SERVER_PORT = 9999;
 	
 	Login login;
-	SignUp signup;
+	SignUp signUp;
 	WaitingRoom waitingRoom;
 	ChangeInfo changeinfo;
 	Game game;
@@ -35,23 +35,27 @@ class Launch {
 	ObjectInputStream in;
 	ObjectOutputStream out;
 	
-	//이 클라이언트의 Player와 별명
+	// 해당 클라이언트의 Player와 별명
 	String nickname;
 	Player player;
 	
-	boolean myTurn;		// true means my turn
-	boolean imReady;	// true means "I'm ready."
-	boolean urReady;	// true means "The opponent is ready."
-	boolean begin;		// true means the game is already started
+	boolean myTurn;		// 참일 때 내 차례
+	boolean imReady;	// 참일 때 준비됐음을 의미
+	boolean urReady;	// 참일 때 상대방이 준비됐음을 의미
+	boolean begin;		// 참일 때 이미 게임이 시작되었음을 의미
 	char[][] board;		// 누가 이겼는지 판단
+	
+	/**
+	 * [Constructor Launch]
+	 */
 	public Launch() throws Exception {
 		login = new Login();
-		init();			// 서버와 연결하는 함수
+		init();	// 서버와 연결하는 함수
 	}
 
 	/**
-	 * [method setName] set the name
-	 * @param name
+	 * [method setNickname] 닉네임 설정
+	 * @param nickname
 	 */
 	public void setNickname(String nickname) {
 		this.nickname = nickname;
@@ -74,10 +78,13 @@ class Launch {
 	}
 	
 	/**
-	 * [class Login]
+	 * [class Login] 로그인
 	 */
 	class Login extends GUI.Login implements ActionListener {
 
+		/**
+		 * [Constructor Login]
+		 */
 		public Login() throws Exception {
 			this.setVisible(true);
 			this.error.setText(null);
@@ -96,6 +103,7 @@ class Launch {
 					char[] temp = passwordBar.infoField.getPassword();
 					String password = new String(temp);
 					Player player = new Player(id, password.getBytes());
+					
 					out.writeObject(new Protocol(1, player));
 					out.flush();
 				} catch (IOException exception) {
@@ -105,11 +113,10 @@ class Launch {
 
 			// 회원가입 버튼 눌렀을 때
 			else if (obj == this.btn.btn2) {
-				//로그인 화면을 숨김
-				this.setVisible(false);
+				this.setVisible(false);	// 로그인 화면을 숨김
 
 				try {
-					signup = new SignUp(); // 회원가입하기 위한 클래스 호출
+					signUp = new SignUp(); // 회원가입하기 위한 클래스 호출
 				} catch (Exception exception) {
 					exception.printStackTrace();
 				}
@@ -118,14 +125,18 @@ class Launch {
 	}
 
 	/**
-	 * [class SignUp] create player account
+	 * [class SignUp] 플레이어 계정 생성 (회원가입)
 	 */
 	class SignUp extends GUI.SignUp implements ActionListener {
+		
+		/**
+		 * [Constructor SignUp]
+		 */
 		public SignUp() throws Exception {
 			this.setVisible(true);
 			this.error.setText(null);
-			this.btn.btn1.addActionListener(this); // 확인 버튼
-			this.btn.btn2.addActionListener(this);// 취소 버튼
+			this.btn.btn1.addActionListener(this);	// 확인 버튼
+			this.btn.btn2.addActionListener(this);	// 취소 버튼
 		}
 
 		@Override
@@ -144,19 +155,20 @@ class Launch {
 					String email = emailBar.infoField.getText();
 					String site = siteBar.infoField.getText();
 					Player player = new Player(id, password.getBytes(), name, nickname, email, site);
-					//id가 비어있을 때
+					
+					// 아이디가 비어있을 때
 					if(id.equals(null)) {
 						this.error.setText("ID가 입력되지 않았습니다");
 					}
-					//비밀번호가 비어있을 때
-					else if(passwordBar.infoField.getPassword().equals(null)||rePasswordBar.infoField.getPassword().equals(null)) {
+					// 비밀번호가 비어있을 때
+					else if(passwordBar.infoField.getPassword().equals(null) || rePasswordBar.infoField.getPassword().equals(null)) {
 						this.error.setText("비밀번호가 입력되지 않았습니다");
 					}
-					//비밀번호가 일치하지 않을 때
+					// 비밀번호가 일치하지 않을 때
 					else if(!password.equals(rePassword)) {
 						this.error.setText("비밀번호가 일치하지 않습니다");
 					}
-					//sign up 메세지 전송
+					// sign up 메시지 전송
 					else {
 						out.writeObject(new Protocol(2, player));
 						out.flush();
@@ -179,15 +191,19 @@ class Launch {
 		}
 	}
 
+	/**
+	 * [class WaitingRoom] 전체 대기실
+	 */
 	class WaitingRoom extends GUI.WaitingRoom implements ActionListener {
 
 		public WaitingRoom() {
 			player.setStatus(1);
 			this.setVisible(true);
-			//채팅창의 내용과 대기 목록을 비움
+			// 채팅창의 내용과 대기 목록을 비움
 			chatWindow.Contents.removeAllElements();
 			currentUsers.content.removeAllElements();
-			//대기실에 입장했다는 메세지를 전송
+			
+			// 대기실에 입장했다는 메세지를 전송
 			try {
 				out.writeObject(new Protocol(12, nickname));
 				out.flush();
@@ -205,9 +221,9 @@ class Launch {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Object obj = e.getSource();
-			//enter 버튼을 눌렀을 때
+			// enter 버튼을 눌렀을 때
 			if(obj==this.chat.enter) {
-				//채팅 입력창을 비우고 채팅 내용을 메세지로 전송
+				// 채팅 입력창을 비우고 채팅 내용을 메세지로 전송
 				try {
 					out.writeObject(new Protocol(13, nickname, "server", this.chat.chatCon.getText()));
 					out.flush();
@@ -216,9 +232,9 @@ class Launch {
 					e1.printStackTrace();
 				}
 			}
-			//나가기 버튼을 눌렀을 때
+			// 나가기 버튼을 눌렀을 때
 			else if(obj==this.currentUsers.miscBtn.btn2) {
-				//창을 닫고 로그아웃 한다는 메세지를 전송
+				// 창을 닫고 로그아웃 한다는 메세지를 전송
 				dispose();
 				try {
 					out.writeObject(new Protocol(14, nickname));
@@ -226,38 +242,41 @@ class Launch {
 				} catch (Exception e1) {
 					e1.printStackTrace();
 				}
-				//로그인 화면으로 되돌아감
+				// 로그인 화면으로 되돌아감
 				login.setVisible(true);
 			}
-			//정보 수정 버튼을 눌렀을 때
+			// 정보 수정 버튼을 눌렀을 때
 			else if(obj==this.currentUsers.miscBtn.btn1) {
-				//대결을 신청할 수 없는 상태로 바꾸고 정보 수정 화면을 open
-				player.setStatus(2);
-				changeinfo = new ChangeInfo();
+				player.setStatus(2);	// 대결을 신청할 수 없는 상태로 바꾸고
+				changeinfo = new ChangeInfo();	// 정보 수정 화면을 open
 			}
-			//대결을 신청할 수 있는 상태고 대결 신청 버튼을 눌렀을 때
+			// 대결을 신청할 수 있는 상태고 대결 신청 버튼을 눌렀을 때
 			else if(obj == this.currentUsers.userBtn.btn1 && player.getStatus() == 1) {
 				try {
-					//선택한 사람의 별명을 메세지로 전송
+					// 선택한 사람의 별명을 메시지로 전송
 					out.writeObject(new Protocol(4, nickname, currentUsers.users.getSelectedValue().toString()));
 					out.flush();
 					player.setStatus(2);
 				} catch (IOException e1) { e1.printStackTrace(); }
 			}
-			//전적 확인 버튼을 눌렀을 때
+			// 전적 확인 버튼을 눌렀을 때
 			else if(obj == this.currentUsers.userBtn.btn2) {
 				try {
-					//선택한 사람의 별명을 메세지로 전송
+					// 선택한 사람의 별명을 메세지로 전송
 					out.writeObject(new Protocol(5, nickname, currentUsers.users.getSelectedValue().toString()));
 					out.flush();
 				} catch (Exception e1) { e1.printStackTrace(); }
 			}
 		}
 	}
-	//정보 수정 화면
+
+	/**
+	 * [class ChangeInfo] 정보 수정
+	 */
 	class ChangeInfo extends GUI.SignUp implements ActionListener {
 		Player tmp;
 		String oldNick;
+		
 		public ChangeInfo() {
 			this.setVisible(true);
 			this.error.setText(null);
@@ -274,17 +293,18 @@ class Launch {
 			tmp = player;
 			oldNick = player.getNickname();
 		}
+		
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Object obj = e.getSource();
-			//cancel 버튼을 눌렀을 때
+			// cancel 버튼을 눌렀을 때
 			if(obj == this.btn.btn2) {
-				//정보 수정 화면을 닫음
+				// 정보 수정 화면을 닫음
 				this.dispose();
 			}
-			//confirm 버튼을 눌렀을 때
+			// confirm 버튼을 눌렀을 때
 			else if(obj == this.btn.btn1) {
-				//임시로 Player 객체를 만들어서 원래 별명과 함께 메세지로 전송
+				// 임시로 Player 객체를 만들어서 원래 별명과 함께 메세지로 전송
 				tmp.setName(this.nameBar.infoField.getText());
 				tmp.setNickname(this.nicknameBar.infoField.getText());
 				tmp.setEmail(this.emailBar.infoField.getText());
@@ -303,20 +323,18 @@ class Launch {
 	 * [class Game] 게임 실행
 	 */
 	class Game extends GameRoom implements ActionListener {
-		// 게임을 실행할 때 상대의 이름과 자신의 이름을 입력받아서 이름만 표시
-		// 추후 이름이 아니라 Player 객체를 입력하도록 수정해야 할듯
 		int[] tops;
 
 		public Game(Player user, Player opponent) throws Exception {
 			this.setVisible(true);
-			//내 정보 표시
+			// 내 정보 표시
 			this.user.nickname.setText(user.getNickname());
 			this.user.profile.setText("<html>승: " + user.getCountWin() + "<br/>"
 			+ "패: " + user.getCountLose() + "<br/>"
 			+ "무: " + user.getCountDraw() + "</html>");
 			this.user.readyBtn.addActionListener(this);
 			this.user.readyBtn.setText("Not Ready");
-			//상대의 정보 표시
+			// 상대의 정보 표시
 			this.opponent.nickname.setText(opponent.getNickname());
 			this.opponent.profile.setText("<html>승: " + opponent.getCountWin() + "<br/>"
 			+ "패: " + opponent.getCountLose() + "<br/>"
@@ -352,7 +370,7 @@ class Launch {
 					e1.printStackTrace();
 				}
 			}
-			// 게임 판 위의 버튼을 눌렀고 자기 차례인 경우 type이 play고 content가 그 버튼의 index인 메시지를 서버에 보냄
+			// 게임판 위의 버튼을 눌렀고 자기 차례인 경우 type이 play고 content가 그 버튼의 index인 메시지를 서버에 보냄
 			else if (Arrays.stream(gameBoard.btn).anyMatch(obj::equals) && myTurn == true && begin == true) {
 				int b = Arrays.asList(gameBoard.btn).indexOf(obj);
 
@@ -387,20 +405,28 @@ class Launch {
 			}
 		}
 	}
-	//결과 표시 화면
+	
+	/**
+	 * [class Result] 결과 표시
+	 */
 	class Result extends Notice1 implements ActionListener{
 		String flag;
+		
+		/**
+		 * [Constructor Result]
+		 */
 		public Result(String s) {
 			this.flag = null;
 			this.setVisible(true);
 			this.Notice.setText(s);
 			this.Btn.addActionListener(this);
 		}
+		
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			//이겼을 경우
+			// 이겼을 경우
 			if(flag.equals("win")) {
-				//이겼다는 메세지를 전송하고 승리 횟수를 늘림
+				// 이겼다는 메시지를 전송하고 승리 횟수를 늘림
 				try {
 					out.writeObject(new Protocol(11, nickname, game.opponent.nickname.getText(), "win"));
 					out.flush();
@@ -414,9 +440,9 @@ class Launch {
 				waitingRoom = new WaitingRoom();
 				player.setStatus(1);
 			}
-			//졌을 경우
+			// 졌을 경우
 			else if(flag.equals("lose")) {
-				//졌다는 메세지를 전송하고 패배 횟수를 늘림
+				// 졌다는 메세지를 전송하고 패배 횟수를 늘림
 				try {
 					out.writeObject(new Protocol(11, nickname, game.opponent.nickname.getText(), "lose"));
 					out.flush();
@@ -430,7 +456,7 @@ class Launch {
 				waitingRoom = new WaitingRoom();
 				player.setStatus(1);
 			}
-			//비겼을 경우
+			// 비겼을 경우
 			else if(flag.equals("draw")) {
 				//비겼다는 메세지를 전송하고 무승부 횟수를 늘림
 				try {
@@ -447,12 +473,15 @@ class Launch {
 				player.setStatus(1);
 			}
 		}
-		//승패 여부를 확인
+		// 승패 여부를 확인
 		public void setFlag(String flag) {
 			this.flag = flag;
 		}
 	}
-	//게임 신청을 받았을 때 화면
+	
+	/**
+	 * [class Invite] 게임 신청 받았을 때
+	 */
 	class Invite extends Notice2 implements ActionListener{
 		String oppo;
 		public Invite(String s){
@@ -466,10 +495,10 @@ class Launch {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Object obj = e.getSource();
-			//거절 버튼을 눌렀을 때
+			// 거절 버튼을 눌렀을 때
 			if(obj == Btns.btn2) {
 				try {
-					//거절한다는 메세지를 전송
+					// 거절한다는 메시지를 전송
 					out.writeObject(new Protocol(7, oppo, nickname, "cancel"));
 					out.flush();
 					player.setStatus(1);
@@ -478,10 +507,10 @@ class Launch {
 					e1.printStackTrace();
 				}
 			}
-			//수락 버튼을 눌렀을 때
+			// 수락 버튼을 눌렀을 때
 			else if(obj == Btns.btn1) {
 				try {
-					//수락한다는 메세지를 전송
+					//수락한다는 메시지를 전송
 					out.writeObject(new Protocol(7, oppo, nickname, "confirm"));
 					out.flush();
 					dispose();
@@ -492,10 +521,15 @@ class Launch {
 		}
 	}
 
-	/* 서버에서 오는 메시지를 계속 받아서 읽고 반응, 받는 메시지에 대한 응답 선언 */
+	/**
+	 * [class ClientReceiver] 서버에서 오는 메시지를 계속 받아서 읽고 반응, 받는 메시지에 대한 응답 선언
+	 */
 	class ClientReceiver extends Thread {
 		Protocol response = null;
 
+		/**
+		 * [Constructor ClientReceiver]
+		 */
 		public ClientReceiver(Socket socket) {
 			try {
 				in = new ObjectInputStream(socket.getInputStream());
@@ -527,25 +561,26 @@ class Launch {
 							waitingRoom = new WaitingRoom();
 							login.setVisible(false);
 						}
-						//로그인에 실패했을 경우
+						// 로그인에 실패했을 경우
 						else {
 							login.error.setText("존재하지 않는 계정입니다");
 						}
 						break;
+						
 					/* [type: sign up] 회원가입 신청을 했을 때 받는 메세지를 처리 */
 					case 2:
-						//id가 중복되었다는 메세지를 받았을 때
+						// 아이디가 중복되었다는 메시지를 받았을 때
 						if(response.getContent().equals("id")) {
-							signup.error.setText("이미 사용 중인 ID입니다");
+							signUp.error.setText("이미 사용 중인 ID입니다");
 						}
-						//별명이 중복되었다는 메세지를 받았을 때
+						// 별명이 중복되었다는 메시지를 받았을 때
 						else if(response.getContent().equals("nick")) {
-							signup.error.setText("이미 사용 중인 별명입니다");
+							signUp.error.setText("이미 사용 중인 별명입니다");
 						}
-						//성공했을 때
+						// 성공했을 때
 						else {
-							//회원가입 화면을 닫고 로그인 화면으로 돌아감
-							signup.dispose();
+							// 회원가입 화면을 닫고 로그인 화면으로 돌아감
+							signUp.dispose();
 							login.setVisible(true);
 						}
 						
@@ -554,34 +589,39 @@ class Launch {
 						/* 채팅창에 채팅 내용을 표시함 */
 						game.chatWindow.Contents.addElement("[" + response.getFrom() + "]" + response.getContent());
 						break;
+						
 					/* [type: challenge] 대결 신청과 관련된 메세지를 처리 */
 					case 4:
-						//대결 신청을 받았을 때
+						// 대결 신청을 받았을 때
 						if(response.getContent().equals("invite")) {
 							//대결을 신청할 수 없는 상태로 만들고 대결 신청 화면을 띄움
 							player.setStatus(2);
 							invite = new Invite(response.getFrom());
 						}
-						//상대가 대결을 거절했을 때
+						// 상대가 대결을 거절했을 때
 						if(response.getContent().equals("cancel")) {
 							player.setStatus(1);
 							waitingRoom.currentUsers.userStatus.setText("상대가 대결을 거절했습니다");
 						}
-						//상대가 이미 대결 중일 때
+						// 상대가 이미 대결 중일 때
 						if(response.getContent().equals("in game")) {
 							player.setStatus(1);
 							waitingRoom.currentUsers.userStatus.setText("상대가 현재 대결 중입니다");
 						}
 						break;
+					
 					/* [type: information] 상대의 전적을 확인 */
 					case 5:
 						Player tmp = response.getPlayer();
+						String[] log = tmp.getLog();
 						waitingRoom.currentUsers.userStatus.setText("<html>" + tmp.getNickname() + "<br/>"
 								+ "플레이 횟수: " + tmp.getTotalCount() + "<br/>"
 								+ "승: " + tmp.getCountWin() + "<br/>"
 								+ "패: " + tmp.getCountLose() + "<br/>"
-								+ "무: " + tmp.getCountDraw() + "</html>");
+								+ "무: " + tmp.getCountDraw() + "<br/>"
+								+ "마지막 접속: " + log[1] + "</html>");
 						break;
+					
 					/* [type: invite] 게임을 신청했을 때 게임을 실행함 */
 					case 6:
 						myTurn = false; // 게임을 실행함
@@ -599,9 +639,10 @@ class Launch {
 						waitingRoom.dispose();
 						player.setStatus(2);
 						break;
+					
 					/* [type: change] 정보를 수정할 때 */
 					case 8:
-						//별명이 중복되지 않을 경우
+						// 별명이 중복되지 않을 경우
 						if(response.getContent().equals("success")) {
 							//이 클라이언트의 Player 객체와 별명을 수정
 							player = response.getPlayer();
@@ -612,6 +653,7 @@ class Launch {
 							changeinfo.error.setText("이미 사용 중인 별명입니다");
 						}
 						break;
+					
 					/* [type: ready] 게임 중 누군가 준비 버튼을 눌렀을 때 */
 					case 9:
 						/* 상대가 준비 버튼을 눌렀다면 */
@@ -676,7 +718,7 @@ class Launch {
 								result.setFlag("win");
 							}
 							game.tops[num]++;
-							//무승부인지 확인하고 무승부라면 draw 메세지를 보냄
+							// 무승부인지 확인하고 무승부라면 draw 메시지를 보냄
 							if (isDraw()) {
 								result = new Result("무승부입니다");
 								result.setFlag("draw");
@@ -695,7 +737,7 @@ class Launch {
 								result.setFlag("lose");
 							}
 							game.tops[num]++;
-							//무승부인지 확인하고 무승부라면 draw 메세지를 보냄
+							// 무승부인지 확인하고 무승부라면 draw 메시지를 보냄
 							if (isDraw()) {
 								result = new Result("무승부입니다");
 								result.setFlag("draw");
@@ -705,25 +747,29 @@ class Launch {
 							game.gameBoard.turn.setText("당신의 차례입니다");
 						}
 						break;
-					/*상대가 대결 도중 연결이 끊어졌을 때*/
+					
+					/* 상대가 대결 도중 연결이 끊어졌을 때 */
 					case 11:
-						//무승부로 처리
+						// 무승부로 처리
 						result = new Result("상대의 연결이 끊겼습니다");
 						result.setFlag("draw");
 						break;
-					/*대기실에 입장할 때, 다른 누군가가 대기실에 입장했을 때 받는 메세지*/
+					
+					/* 대기실에 입장할 때, 다른 누군가가 대기실에 입장했을 때 받는 메시지 */
 					case 12:
-						//다른 사람의 별명을 대기 목록에 추가함
+						// 다른 사람의 별명을 대기 목록에 추가함
 						if(!response.getFrom().equals(nickname)&&!waitingRoom.currentUsers.content.contains(response.getFrom())) waitingRoom.currentUsers.content.addElement(response.getFrom());
 						break;
-					/* [type: allchat] 대기실에서 누군가 채팅을 보냈을 때 */
+					
+					/* [type: all chat] 대기실에서 누군가 채팅을 보냈을 때 */
 					case 13:
-						//대기실의 채팅 내용 목록에 추가함
+						// 대기실의 채팅 내용 목록에 추가함
 						waitingRoom.chatWindow.Contents.addElement("[" + response.getFrom() + "] " + response.getContent());
 					    break;
+					
 					/* [type: logout] 다른 누군가 로그아웃 했거나 연결이 끊겼을 때 */
 					case 14:
-						//대기 목록에서 그 사람을 지움
+						// 대기 목록에서 그 사람을 지움
 						waitingRoom.currentUsers.content.removeElement(response.getFrom());
 					    break;
 					    
@@ -736,15 +782,20 @@ class Launch {
 			}
 		}
 	}
-	/*무승부인지 판단하는 함수*/
+	
+	/**
+	 * [method isDraw] 무승부인지 판단
+	 */
 	public boolean isDraw() {
 		for(int i: game.tops) {
-			if (i<6) return false;
+			if (i < 6) return false;
 		}
 		return true;
 	}
 
-	/* 이겼는지 판단하는 함수 */
+	/**
+	 * [method isWinning] 이겼는지 판단
+	 */
 	public boolean isWinning(char c, int row, int col) {
 		String s = new String();
 		s = s + String.valueOf(c);
@@ -754,6 +805,9 @@ class Launch {
 		return (horizontal(s, row) || vertical(s, col) || slash(s, row, col) || backslash(s, row, col));
 	}
 
+	/**
+	 * [method horizontal]
+	 */
 	public boolean horizontal(String s, int row) {
 		String hr = new String();
 		for (char c : board[row]) {
@@ -762,6 +816,9 @@ class Launch {
 		return (hr.contains(s));
 	}
 
+	/**
+	 * [method vertical]
+	 */
 	public boolean vertical(String s, int col) {
 		String vr = new String();
 		for (int i = 0; i < 6; i++) {
@@ -770,6 +827,9 @@ class Launch {
 		return (vr.contains(s));
 	}
 
+	/**
+	 * [method slash]
+	 */
 	public boolean slash(String s, int row, int col) {
 		int r = row;
 		int c = col;
@@ -786,6 +846,9 @@ class Launch {
 		return (sl.contains(s));
 	}
 
+	/**
+	 * [method backslash]
+	 */
 	public boolean backslash(String s, int row, int col) {
 		int r = row;
 		int c = col;

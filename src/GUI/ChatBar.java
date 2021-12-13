@@ -15,7 +15,7 @@ public class ChatBar extends JPanel {
 	public ChatBar(int width, int height) { // 너비와 높이를 입력받아서 사용
 		super();
 
-		chatCon = new JTextField(40); // 내용을 입력할 필드
+		chatCon = new JTextField(50); // 내용을 입력할 필드
 		enter = new JButton("Enter"); // 내용을 채팅창으로 보낼 버튼
 		
 		enter.setPreferredSize(new Dimension(width / 10 - 10, height));

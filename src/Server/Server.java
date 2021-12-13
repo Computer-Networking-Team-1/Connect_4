@@ -7,77 +7,103 @@ import java.util.Map.Entry;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 
+/**
+ * [class Server]
+ */
 public class Server extends Thread {
 	private final static int SERVER_PORT = 9999;
 	private static final int SALT_SIZE = 16;		// 16bytes = 128bits
-	private static Player playerDB = new Player();	// player database (with ArrayList and file)
+	private static Player playerDB = new Player();	// ArrayList, File을 이용한 플레이어 데이터베이스
 	
-	//현재 접속 중인 사람들의 Player, OutputStream, Nickname
+	// 현재 접속 중인 사람들의 Player, OutputStream, Nickname
 	public static ArrayList<Player> players = new ArrayList<Player>();
 	public static HashMap<String, ObjectOutputStream> sockets = new HashMap<String, ObjectOutputStream>();
 	public static HashMap<String, Player> nicknameToPlayer = new HashMap<String, Player>();	// 대기실 구현 위해
 	private Player player = null;
 	private Socket socket = null;
 	
-	//이 클라이언트가 현재 대결 중인지 확인하는 HashMap
+	// 해당 클라이언트가 현재 대결 중인지 확인하는 HashMap
 	private HashMap<String, String> inBattle;
 	
+	/**
+	 * [Constructor Server]
+	 */
 	public Server(Socket socket) {
 		this.socket = socket;
 	}
-	//접속한 사람을 목록에 추가
-	public synchronized void addUser(Player p, ObjectOutputStream outToClient) {
+	
+	/**
+	 * [method addPlayer] 접속한 사람을 목록에 추가
+	 * @param player
+	 * @param outToClient
+	 */
+	public synchronized void addPlayer(Player p, ObjectOutputStream outToClient) {
 		sockets.put(p.getNickname(), outToClient);
 		nicknameToPlayer.put(p.getNickname(), p);
 		players.add(p);
 	}
-	//연결이 끊기거나 로그아웃 하는 사람을 목록에서 제거
-	public synchronized void removeUser(Player p) {
+	
+	/**
+	 * [method removePlayer] 연결이 끊기거나 로그아웃하는 사람을 목록에서 제거
+	 * @param player
+	 */
+	public synchronized void removePlayer(Player p) {
 		sockets.remove(p.getNickname());
 		nicknameToPlayer.remove(p.getNickname());
 		players.remove(p);
 	}
 	
+	/**
+	 * [method run] thread 실행
+	 */
 	public void run() {
 		System.out.println(">> " + socket);
 		Protocol request = null;
 		ObjectInputStream in = null;	// 클라이언트로부터 객체를 읽어오기 위해
 		ObjectOutputStream out = null;	// 클라이언트로 객체를 내보내기 위해
 		inBattle = new HashMap<String, String>();
+		
 		try {
 			in = new ObjectInputStream(this.socket.getInputStream());
 			out = new ObjectOutputStream(this.socket.getOutputStream());
 			
-			/* 클라이언트에서 오는 메시지를 기다렸다가 반응해서 응답 */
-			while(true) {
-				request = (Protocol) in.readObject();	// 클라이언트로부터 프로토콜 객체를 전달받기
+			while(true) {	// 클라이언트에서 오는 메시지를 기다렸다가 반응해서 응답
+				request = (Protocol) in.readObject();	// 클라이언트로부터 프로토콜 객체 전달받기
 				System.out.println(">> type: " + request.getType() + " from: " + request.getFrom() + " to: " + request.getTo() + " content: " + request.getContent() + " player: " + request.getPlayer() + " users: " + players.size());
 				
-				int type = request.getType();
+				int type = request.getType();	// 타입 저장
 				Player temp = null;
 				String tempSalt = null;
 				String tempPassword = null;
 				
 				switch(type) {
 
-				/* [type: login] outputStream mapping*/
+				/* [type: login] outputStream 연결 */
 				case 1:
 					Player.setInformation();
-					temp = (Player) request.getPlayer();	// 아이디와 패스워드 정보가 담긴 객체를 받아서
+					temp = (Player) request.getPlayer();	// 아이디와 패스워드 정보가 담긴 객체 전달받기
 					tempSalt = playerDB.getSalt(temp.getId());
 					tempPassword = hashing(temp.getPasswordByte(), tempSalt);
 					
-					if(playerDB.check(temp.getId(), tempPassword)) {	// 로그인 성공
+					System.out.println(">> " + socket.getLocalAddress().toString());
+					
+					// 로그인 성공
+					if(playerDB.check(temp.getId(), tempPassword, socket.getLocalAddress().toString())) {
 						System.out.println(">> login success");
 						player = playerDB.getPlayerById(temp.getId());
 						player.setStatus(1);
-						addUser(player, out);
-						out.writeObject(new Protocol(1, "SUCCESS", player));
+						addPlayer(player, out);
+						
+						out.writeObject(new Protocol(1, "SUCCESS", player));	// 클라이언트에게 성공했다는 메시지 전송
 						out.flush();
+						
+						int idx = playerDB.getPlayerIndex(temp.getId());
+						Player.players.set(idx, player);
 					}
-					else {	// 로그인 실패
-						System.out.println(">> login fail");
-						out.writeObject(new Protocol(1, request.getFrom(), request.getTo(), "FAIL"));
+					// 로그인 실패
+					else {
+						System.out.println(">> login failure");
+						out.writeObject(new Protocol(1, request.getFrom(), request.getTo(), "FAIL"));	// 클라이언트에게 실패했다는 메시지 전송
 						out.flush();
 					}
 					break;
@@ -86,31 +112,27 @@ public class Server extends Thread {
 				case 2:
 					Player.setInformation();
 					temp = (Player) request.getPlayer();
-					//id가 중복되는지 확인
-					if(playerDB.idCheck(temp.getId())) {
-						//별명이 중복되는지 확인
-						if(playerDB.nickCheck(temp.getNickname())) {
+
+					if(playerDB.idCheck(temp.getId())) {	// 아이디 중복 확인
+						if(playerDB.nickCheck(temp.getNickname())) {	// 별명이 중복되는지 확인
 								tempSalt = createSalt();
 								tempPassword = hashing(temp.getPasswordByte(), tempSalt);
 								playerDB.setPlayer(temp.getId(), tempPassword, tempSalt, temp);
-								Player.updateInformation();
-								//성공했다는 메세지 전송
-								out.writeObject(new Protocol(2, null, null, "success"));
-								System.out.printf(">> ");
-								System.out.printf("Sign Up %d %s (# of users: %d)\n", request.getType(), request.getFrom(), players.size());
+								Player.updateInformation();	// 플레이어 정보 업데이트
+								
+								out.writeObject(new Protocol(2, null, null, "success"));	// 클라이언트에게 성공했다는 메시지 전송
+								System.out.printf(">> Sign Up %d %s (# of users: %d)\n", request.getType(), request.getFrom(), players.size());
 						}
-						//별명이 중복되면 중복된 것이 별명임을 알리는 메세지 전송
-						else {
+						else {	// 별명이 중복되면 중복된 것이 별명임을 알리는 메시지 전송
 							out.writeObject(new Protocol(2, null, null, "nick"));
 						}
 					}
-					//id가 중복되면 중복된 것이 id임을 알리는 메세지 전송
-					else {
+					else {	// 아이디가 중복되면 중복된 것이 아이디임을 알리는 메시지 전송
 						out.writeObject(new Protocol(2, null, null, "id"));
 					}
 					break;
 					
-				/* [type: chat] 게임 중인 양쪽 client에 채팅한 내용을 메시지로 보냄*/
+				/* [type: chat] 게임 중인 양쪽 클라이언트에 채팅한 내용을 메시지로 보냄 */
 				case 3:
 					System.out.println(request.getContent());
 						out.writeObject(new Protocol(3, request.getFrom(), request.getTo(), request.getContent()));
@@ -128,23 +150,26 @@ public class Server extends Thread {
 						sockets.get(request.getTo()).writeObject(new Protocol(4, request.getFrom(), request.getTo(), "invite"));
 						sockets.get(request.getTo()).flush();
 					}
-					//상대가 게임 중이면 게임 중이라는 메시지를 보냄
+					// 상대가 게임 중이면 게임 중이라는 메시지를 보냄
 					else {
 						out.writeObject(new Protocol(4, request.getFrom(), request.getTo(), "in game"));
 						out.flush();
 					}
 					break;
-				/* [type: information] 검색한 상대의 Player 객체를 전송 */
+					
+				/* [type: information] 전적 검색한 상대의 Player 객체를 전송 */
 				case 5:
 					out.writeObject(new Protocol(5, nicknameToPlayer.get(request.getTo())));
 					break;
+					
 				case 6:
 					break;
-				/* [type: invited] 대결 신청을 받은 사람의 행동을 처리*/
+				
+				/* [type: invited] 대결 신청을 받은 사람의 행동을 처리 */
 				case 7:
-					//상대가 대결을 수락했을 때
+					// 상대가 대결을 수락했을 때
 					if(request.getContent().equals("confirm")) {
-							//양쪽 플레이어에 대결을 하라는 메세지를 보냄
+							// 양쪽 플레이어에 대결을 하라는 메시지를 보냄
 							nicknameToPlayer.get(request.getFrom()).setStatus(2);
 							nicknameToPlayer.get(request.getTo()).setStatus(2);
 							out.writeObject(new Protocol(7, request.getFrom(), request.getTo(), nicknameToPlayer.get(request.getFrom())));
@@ -156,21 +181,24 @@ public class Server extends Thread {
 							inBattle.put(request.getFrom(), request.getTo());
 							inBattle.put(request.getTo(), request.getFrom());
 					}
-					//상대가 대결을 거절했을 때
+					
+					// 상대가 대결을 거절했을 때
 					if(request.getContent().equals("cancel")) {
-						//대결을 신청한 측에 거절 메세지를 보냄
+						// 대결을 신청한 측에 거절 메시지를 보냄
 						nicknameToPlayer.get(request.getFrom()).setStatus(1);
 						nicknameToPlayer.get(request.getTo()).setStatus(1);
 						sockets.get(request.getFrom()).writeObject(new Protocol(4, request.getFrom(), request.getTo(), "cancel"));
 						sockets.get(request.getFrom()).flush();
 					}
 					break;
+				
 				/* [type: change] 정보를 수정 */
 				case 8:
-					//새 별명이 다른 사람의 별명과 중복되는지 확인
+					// 새 별명이 다른 사람의 별명과 중복되는지 확인
 					if(playerDB.changeNickCheck(request.getPlayer().getNickname(), request.getContent())) {
 						Player tmp = request.getPlayer();
-						//Server의 players와 Player의 players를 수정
+						
+						// 서버의 players와 Player의 players를 수정
 						for(Player p: players) {
 							if(p.getId().equals(player.getId())) {
 								p.setName(tmp.getName());
@@ -189,36 +217,43 @@ public class Server extends Thread {
 								p.setStatus(tmp.getStatus());
 							}
 						}
-						//이 클라이언트의 Player 객체 수정
+						
+						// 이 클라이언트의 Player 객체 수정
 						player.setName(tmp.getName());
 						player.setNickname(tmp.getNickname());
 						player.setEmail(tmp.getEmail());
 						player.setSite(tmp.getSite());
 						player.setStatus(tmp.getStatus());
-						//별명과 Player, 별명과 OutputStream을 map 하는 HashMap 수정
+						
+						// 별명과 Player, 별명과 OutputStream을 map 하는 HashMap 수정
 						nicknameToPlayer.remove(request.getContent());
 						nicknameToPlayer.put(player.getNickname(), player);
 						sockets.remove(request.getContent());
 						sockets.put(player.getNickname(), out);
-						//대기실에 있는 사람들의 대기 목록에서 별명을 지웠다가 새 별명을 추가시킴
+						
+						// 대기실에 있는 사람들의 대기 목록에서 별명을 지웠다가 새 별명을 추가시킴
 						for(Entry<String, ObjectOutputStream> e1:sockets.entrySet()) {
 					    	if(nicknameToPlayer.get(e1.getKey()).getStatus()==1) {
 								e1.getValue().writeObject(new Protocol(14, request.getContent()));
 								e1.getValue().flush();
 					    	}
 					    }
+						
 						for(Entry<String, ObjectOutputStream> e:sockets.entrySet()) {
 							e.getValue().writeObject(new Protocol(12, player.getNickname()));
 							e.getValue().flush();
 						}
-						//성공했다는 메세지 전송
+						
+						// 성공했다는 메시지 전송
 						out.writeObject(new Protocol(8, "success", player));
 					}
-					//중복되면 fail 메세지를 보냄
+					
+					// 중복되면 fail 메시지를 보냄
 					else {
 						out.writeObject(new Protocol(8, "fail", player));
 					}
 					break;
+					
 				/* [type: ready] 양쪽 client에 누군가 준비 버튼을 눌렀다고 알림 */
 				case 9:
 						out.writeObject(new Protocol(9, request.getFrom(), request.getTo(), request.getContent()));
@@ -237,55 +272,71 @@ public class Server extends Thread {
 					
 				/* 게임이 끝났을 때 처리할 내용 */
 				case 11:
-					//대결 중인지 확인하는 HashMap을 비움
+					// 대결 중인지 확인하는 HashMap을 비움
 					inBattle.clear();
-						//이겼을 때
+					
+						// 이겼을 때
 						if(request.getContent().equals("win")) {
 							player.setCountWin(player.getCountWin() + 1);
-							System.out.println("win: " + player.getCountWin());
+							System.out.println(">> win: " + player.getCountWin());
 							player.setStatus(1);
+							
 							nicknameToPlayer.remove(player.getNickname());
 							nicknameToPlayer.put(player.getNickname(), player);
+							System.out.println(">> the number of wins: " + player.getCountWin());
 							for(String name:nicknameToPlayer.keySet()) {
 								System.out.println(name);
 							}
 						}
-						//졌을 때
+						
+						// 졌을 때
 						else if(request.getContent().equals("lose")) {
 							player.setCountLose(player.getCountLose() + 1);
-							System.out.println("lose: " + player.getCountLose());
+							System.out.println(">> lose: " + player.getCountLose());
 							player.setStatus(1);
+							
 							nicknameToPlayer.remove(player.getNickname());
 							nicknameToPlayer.put(player.getNickname(), player);
+							System.out.println(">> the number of loses: " + player.getCountLose());
 							for(String name:nicknameToPlayer.keySet()) {
 								System.out.println(name);
 							}
 						}
-						//비겼을 때
+						
+						// 비겼을 때
 						else if(request.getContent().equals("draw")){
 							player.setCountDraw(player.getCountDraw() + 1);
 							System.out.println("draw: " + player.getCountDraw());
 							player.setStatus(1);
+							
 							nicknameToPlayer.remove(player.getNickname());
 							nicknameToPlayer.put(player.getNickname(), player);
+							System.out.println(">> the number of draws: " + player.getCountDraw());
 						}
+						
+						int idx = playerDB.getPlayerIndex(player.getId());
+						Player.players.set(idx, player);
+						Player.updateInformation();
+						Player.setInformation();
 					break;
-				/* [type: wait] 누군가 로그인 했거나 게임을 끝내서 대기실에 입장했을 때 처리하는 내용*/
+					
+				/* [type: wait] 누군가 로그인 했거나 게임을 끝내서 대기실에 입장했을 때 처리하는 내용 */
 				case 12:
-						//이미 접속해있던 사람들의 목록을 전송
+						// 이미 접속해있던 사람들의 목록을 전송
 						for(Player p:players) {
 							out.writeObject(new Protocol(12, p.getNickname()));
 							out.flush();
 						}
-						//다른 사람들에게 새로 접속한 사람의 별명을 전송
+						// 다른 사람들에게 새로 접속한 사람의 별명을 전송
 						for(Entry<String, ObjectOutputStream> e:sockets.entrySet()) {
 							e.getValue().writeObject(new Protocol(12, player.getNickname()));
 							e.getValue().flush();
 						}
 					break;
+					
 				/* [type: allchat] 대기실에 있는 사람들의 채팅 */
 				case 13:
-					//대기실에 있는 모든 사람에게 채팅을 보냄
+					// 대기실에 있는 모든 사람에게 채팅을 보냄
 					for(Entry<String, ObjectOutputStream> e:sockets.entrySet()) {
 						if(nicknameToPlayer.get(e.getKey()).getStatus()==1) {
 							e.getValue().writeObject(new Protocol(13, request.getFrom(), request.getTo(), request.getContent()));
@@ -293,19 +344,20 @@ public class Server extends Thread {
 						}
 					}
 					break;
+					
 				/* [type: logout] 로그아웃 했을 때 처리할 내용 */
 				case 14:
-					//로그인 했었는지 확인
+					// 로그인 했었는지 확인
 					if(player!=null) {
-						//Player의 players를 update
+						// Player의 players를 update
 						for(Player p: Player.players) {
 							if(p.getId().equals(player.getId())) p = player;
 						}
-						//player_information 파일을 update
+						// player_information 파일을 update
 						Player.updateInformation();
-						//접속한 사람들의 목록에서 이 사용자를 삭제
-						removeUser(player);
-						//접속해있는 사람들 중 대기실에 있는 사람들의 대기 목록에서 이 사용자를 삭제
+						// 접속한 사람들의 목록에서 이 사용자를 삭제
+						removePlayer(player);
+						// 접속해있는 사람들 중 대기실에 있는 사람들의 대기 목록에서 이 사용자를 삭제
 					    for(Entry<String, ObjectOutputStream> e1:sockets.entrySet()) {
 					    	if(nicknameToPlayer.get(e1.getKey()).getStatus()==1) {
 					    		try {
@@ -324,25 +376,34 @@ public class Server extends Thread {
 				}
 			}
 		}catch(SocketException e) {
-			//접속이 끊기거나 창을 닫았을 때: SocketException 발생
-			//logout 했을 때와 똑같이 처리함
+			// 접속이 끊기거나 창을 닫았을 때: SocketException 발생
+			// logout 했을 때와 똑같이 처리함
 			if(player!=null) {
 				for(Player p: Player.players) {
 					if(p.getId().equals(player.getId())) p = player;
 				}
+				
 			    if(!inBattle.isEmpty()) {
 			    	try {
 						sockets.get(inBattle.get(player.getNickname())).writeObject(new Protocol(11, player.getNickname()));
 						sockets.get(inBattle.get(player.getNickname())).flush();
 						inBattle.clear();
 						player.setCountDraw(player.getCountDraw()+1);
+						
+						int idx = playerDB.getPlayerIndex(player.getId());
+						Player.players.set(idx, player);
+						request.setPlayer(player);
+						
+						Player.updateInformation();
+						Player.setInformation();
 					} catch (IOException e2) {
 						e2.printStackTrace();
 					}
 			    }
 				Player.updateInformation();
-			    removeUser(player);
-			    for(Entry<String, ObjectOutputStream> e1:sockets.entrySet()) {
+			    removePlayer(player);
+			    
+			    for(Entry<String, ObjectOutputStream> e1: sockets.entrySet()) {
 			    	if(nicknameToPlayer.get(e1.getKey()).getStatus()==1) {
 			    		try {
 							e1.getValue().writeObject(new Protocol(14, player.getNickname()));
@@ -403,6 +464,9 @@ public class Server extends Thread {
 		return sb.toString();
 	}
 	
+	/**
+	 * [method main] 실행
+	 */
 	public static void main(String[] args) {
 		ServerSocket listener = null;
 		Socket client = null;

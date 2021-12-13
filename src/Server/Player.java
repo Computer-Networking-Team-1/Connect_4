@@ -4,11 +4,12 @@ import java.io.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class Player implements Serializable {
 	
-	// private static ArrayList<String[]> player = new ArrayList<>();
 	public static ArrayList<Player> players = new ArrayList<Player>();
 	
 	private String id;				// 아이디
@@ -26,7 +27,7 @@ public class Player implements Serializable {
 	private int totalCount = 0;		// 전체 게임 횟수
 	
 	private int loginCount;					// 접속 횟수
-	private String[] log = new String[2];	// 마지막 접속 정보 (IP주소, 시간)
+	private String[] log = new String[2];	// 마지막 접속 정보 (IP 주소, 시간)
 	private int status = 0; 				// [0] 로그아웃 [1] 대기중 [2] 게임중
 
 	public Player() {}
@@ -48,10 +49,10 @@ public class Player implements Serializable {
 	}
 	
 	/**
-	 * [method setPlayer] create player (at Sign Up)
+	 * [method setPlayer] 플레이어 생성 (at Sign Up)
 	 * @param id
 	 * @param password
-	 * @param salt
+	 * @param salt (비밀번호 해싱을 위한)
 	 */
 	public void setPlayer(String id, String password, String salt, Player temp) {
 		this.id = id;
@@ -60,11 +61,8 @@ public class Player implements Serializable {
 		this.name = temp.getName();
 		this.nickname = temp.getNickname();
 		this.email = temp.getEmail();
-		this.site = temp.getEmail();
-		
+		this.site = temp.getSite();
 		this.loginCount = 0;
-		this.log = null;
-		
 		players.add(this);
 	}
 	
@@ -74,45 +72,69 @@ public class Player implements Serializable {
 	 * @param password
 	 * @return true if matched, or false if not matched
 	 */
-	public boolean check(String id, String password) {
+	public boolean check(String id, String password, String IP) {
 		for(int i = 0; i < players.size(); i++) {
 			if(id.contentEquals(players.get(i).getId()) && password.equals(players.get(i).getPassword())) {
 				players.get(i).setLoginCount();	// 접속할 때마다 ++
-				// 접속 정보 갱신
+				players.get(i).setLog(IP);		// 접속 정보 갱신
 				return true;
 			}
 		}
 		return false;
 	}
-	//중복되는 id인지 확인
+
+	/**
+	 * [method idCheck] 중복되는 아이디인지 확인
+	 */
 	public boolean idCheck(String id) {
 		for(Player p:players) {
 			if(id.equals(p.getId())) return false;
 		}
 		return true;
 	}
-	//중복되는 nickname인지 확인
+	
+	/**
+	 * [method nickCheck] 중복되는 닉네임인지 확인
+	 */
 	public boolean nickCheck(String nickname) {
-		for(Player p:players) {
+		for(Player p: players) {
 			if(nickname.equals(p.getNickname())) return false;
 		}
 		return true;
 	}
-	//정보를 수정할 때, 다른 사람과 중복되는 nickname인지 확인
+	
+	/**
+	 * [method changeNickCheck] 정보를 수정할 때 다른 사람과 중복되는 닉네임인지 확인
+	 */
 	public boolean changeNickCheck(String nickname, String origin) {
-		for(Player p:players) {
+		for(Player p: players) {
 			if(nickname.equals(p.getNickname())&&!origin.equals(p.getNickname())) return false;
 		}
 		return true;
 	}
-	//id로 Player 객체를 찾아서 return
+	
+	/**
+	 * [method getPlayerByID] 아이디로 Player 객체 찾아서 반환
+	 */
 	public Player getPlayerById(String id) {
-		for(Player p:players) {
+		for(Player p: players) {
 			if(p.getId().equals(id)) {
 				return p;
 			}
 		}
 		return null;
+	}
+	
+	/**
+	 * [method getPlayerIndex] 아이디로 해당 Player 객체의 인덱스 반환
+	 */
+	public int getPlayerIndex(String id) {
+		for(int i = 0; i < players.size(); i++) {
+			if(players.get(i).getId().equals(id)) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	/**
@@ -130,7 +152,7 @@ public class Player implements Serializable {
 	}
 	
 	/**
-	 * [method setInformation] initialize the setting with the data stored in the file
+	 * [method setInformation] 파일에 저장된 데이터로 초기 세팅
 	 */
 	public static void setInformation() {
 		File file = new File("./player_information.txt");
@@ -164,14 +186,14 @@ public class Player implements Serializable {
 					fromFile.close();
 				}
 			} catch(Exception e) {
-				// none
+				e.printStackTrace();
 			}
 		}
 		System.out.println(">> finish the initial setting");
 	}
 	
 	/**
-	 * [method updateInformation] update the information in the file
+	 * [method updateInformation] 파일에 있는 정보를 업데이트
 	 */
 	public static void updateInformation() {
 		File file = new File("./player_information.txt");
@@ -227,7 +249,7 @@ public class Player implements Serializable {
 	}
 
 	public void setCountWin(int count) {
-		this.countWin = count; 
+		this.countWin = count;
 		this.setTotalCount();
 	}
 
@@ -249,8 +271,34 @@ public class Player implements Serializable {
 		this.loginCount += 1;
 	}
 	
-	public void setLog() {
-		// 접속 정보
+	public void setLog(String IP) {
+		/* IP 주소 */
+		this.log[0] = IP;
+		
+		/* 현재 날짜 구하기 */
+		LocalDate nowDate = LocalDate.now();
+		int dayOfMonth = nowDate.getDayOfMonth();
+		String dd = Integer.toString(dayOfMonth);
+		
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM" + dd);
+		String today = nowDate.format(formatter);
+		this.log[1] = today;
+	}
+	
+	public void setFirstLog(String IP) {
+		/* IP 주소 */
+		this.log[0] = IP;
+	}
+	
+	public void setSecondLog() {
+		/* 현재 날짜 구하기 */
+		LocalDate nowDate = LocalDate.now();
+		int dayOfMonth = nowDate.getDayOfMonth();
+		String dd = Integer.toString(dayOfMonth);
+		
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM" + dd);
+		String today = nowDate.format(formatter);
+		this.log[1] = today;
 	}
 	
 	public void setStatus(int status) {
@@ -304,7 +352,16 @@ public class Player implements Serializable {
 	public int getTotalCount() {
 		return this.totalCount;
 	}
+	
 	public int getStatus() {
 		return this.status;
+	}
+	
+	public int getLoginCount() {
+		return this.loginCount;
+	}
+	
+	public String[] getLog() {
+		return this.log;
 	}
 }
